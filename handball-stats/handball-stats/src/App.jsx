@@ -9,17 +9,17 @@ import MatchStats from '@/pages/Matches/MatchStats'
 export default function App() {
   return (
     <Routes>
-      {/* Matches/LiveMatch runs fullscreen (no bottom nav) */}
+      {/* LiveMatch is fullscreen – no bottom nav */}
       <Route path="/matches/:id" element={<LiveMatch />} />
 
-      {/* All other routes use the Layout with bottom nav */}
+      {/* All other routes use Layout with bottom nav */}
       <Route element={<Layout />}>
-        <Route path="/"                       element={<Home />} />
-        <Route path="/teams"                  element={<TeamsList />} />
-        <Route path="/teams/:id"              element={<TeamDetail />} />
-        <Route path="/matches"               element={<MatchesList />} />
-        <Route path="/matches/:id/stats"     element={<MatchStats />} />
-        <Route path="*"                      element={<Navigate to="/" replace />} />
+        <Route path="/"                  element={<Home />} />
+        <Route path="/teams"             element={<TeamsList />} />
+        <Route path="/teams/:id"         element={<TeamDetail />} />
+        <Route path="/matches"           element={<MatchesList />} />
+        <Route path="/matches/:id/stats" element={<MatchStats />} />
+        <Route path="*"                  element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
   )
