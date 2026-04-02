@@ -1,103 +1,113 @@
 import clsx from 'clsx'
 
 /**
- * CourtView – SVG handball half-court with clickable zones.
- *
- * Zones radiate as sectors from the goal centre (180, 50):
- *   extreme_left  | back_left | center | back_right | extreme_right
- *   pivot (near 6m) | 7m spot
- *
- * Props:
- *   selectedZone  – string id of active zone
- *   onZoneSelect  – (zoneId: string) => void
- *   flipped       – boolean, mirror court left↔right
- *   heatmap       – { [zoneId]: number } optional count for stats overlay
+ * CourtView – SVG handball half-court, Steazzi-style.
+ * ViewBox: 320 x 500
+ * Goal line at y=80. Goal centre (CX=160, CY=80).
+ * Goal posts: left=117, right=203 (width 86px)
+ * 6m radius: 120px | 9m radius: 183px
  */
 
-const ZONE_FILL_ACTIVE  = 'rgba(234,179,8,0.45)'
-const ZONE_FILL_HOVER   = 'rgba(255,255,255,0.06)'
-const ZONE_FILL_DEFAULT = 'transparent'
+const CX = 160
+const CY = 80
+const BOTTOM = 500
 
-// SVG viewBox: 360 × 420
-// Goal line at y=50, court bottom at y=420
-// Goal centre: (180, 50), left post: (147, 50), right post: (213, 50)
-// 6m arc approximate: radius ~100px from (180,50)
-// 9m arc approximate: radius ~155px from (180,50) (dashed)
+// Bottom x anchors for zone divisions
+const B_EXT_LEFT   = 30
+const B_BACK_LEFT  = 112
+const B_BACK_RIGHT = 208
+const B_EXT_RIGHT  = 290
+
+// Goal posts x
+const T_LEFT  = 117
+const T_RIGHT = 203
+
+// Pivot zone
+const PIVOT_BOTTOM = CY + 110
+const PIVOT_BL = CX - 68
+const PIVOT_BR = CX + 68
 
 const COURT_ZONES = [
   {
     id: 'extreme_left',
-    label: 'Ext.\nIzq.',
-    // Quadrilateral: top-left corner → goal left post → bottom 0–72 → left edge
-    polygon: '0,30 147,50 72,420 0,420',
-    labelPos: { x: 30, y: 320 },
+    label: ['Extremo', 'Izq.'],
+    pts: `0,${CY} ${T_LEFT},${CY} ${B_EXT_LEFT},${BOTTOM} 0,${BOTTOM}`,
+    lx: 20, ly: 340,
   },
   {
     id: 'back_left',
-    label: 'Lat.\nIzq.',
-    // Triangle: goal centre → bottom 72–144
-    polygon: '147,50 180,50 144,420 72,420',
-    labelPos: { x: 105, y: 310 },
+    label: ['Lateral', 'Izq.'],
+    pts: `${T_LEFT},${CY} ${CX},${CY} ${B_BACK_LEFT},${BOTTOM} ${B_EXT_LEFT},${BOTTOM}`,
+    lx: 88, ly: 310,
   },
   {
     id: 'center',
-    label: 'Central',
-    // Triangle: goal centre → bottom 144–216
-    polygon: '180,50 144,420 216,420',
-    labelPos: { x: 180, y: 330 },
+    label: ['Central'],
+    pts: `${CX},${CY} ${B_BACK_LEFT},${BOTTOM} ${B_BACK_RIGHT},${BOTTOM}`,
+    lx: 160, ly: 370,
   },
   {
     id: 'back_right',
-    label: 'Lat.\nDer.',
-    // Mirror of back_left
-    polygon: '180,50 213,50 288,420 216,420',
-    labelPos: { x: 255, y: 310 },
+    label: ['Lateral', 'Der.'],
+    pts: `${CX},${CY} ${T_RIGHT},${CY} ${B_EXT_RIGHT},${BOTTOM} ${B_BACK_RIGHT},${BOTTOM}`,
+    lx: 232, ly: 310,
   },
   {
     id: 'extreme_right',
-    label: 'Ext.\nDer.',
-    // Mirror of extreme_left
-    polygon: '213,50 360,30 360,420 288,420',
-    labelPos: { x: 330, y: 320 },
+    label: ['Extremo', 'Der.'],
+    pts: `${T_RIGHT},${CY} 320,${CY} 320,${BOTTOM} ${B_EXT_RIGHT},${BOTTOM}`,
+    lx: 300, ly: 340,
   },
   {
     id: 'pivot',
-    label: 'Pivote',
-    // Trapezoid near 6m line, overlaid in centre
-    polygon: '135,50 225,50 225,118 135,118',
-    labelPos: { x: 180, y: 100 },
+    label: ['Pivote'],
+    pts: `${CX - 55},${CY} ${CX + 55},${CY} ${PIVOT_BR},${PIVOT_BOTTOM} ${PIVOT_BL},${PIVOT_BOTTOM}`,
+    lx: 160, ly: PIVOT_BOTTOM - 8,
   },
 ]
 
-function ZonePolygon({ zone, isSelected, onClick, heatValue, maxHeat }) {
-  const heatOpacity = maxHeat > 0 ? (heatValue ?? 0) / maxHeat : 0
-
+function Goal() {
+  const x = T_LEFT, y = 28, w = T_RIGHT - T_LEFT, h = 54
   return (
-    <g
-      onClick={() => onClick(zone.id)}
-      className="cursor-pointer"
-      style={{ outline: 'none' }}
-    >
-      <polygon
-        points={zone.polygon}
-        fill={
-          isSelected
-            ? ZONE_FILL_ACTIVE
-            : heatOpacity > 0
-              ? `rgba(239,100,97,${0.1 + heatOpacity * 0.5})`
-              : ZONE_FILL_DEFAULT
-        }
-        stroke={isSelected ? '#eab308' : 'transparent'}
-        strokeWidth={isSelected ? 2 : 0}
-        className="transition-colors duration-150"
-      />
-      {/* Invisible larger hit area */}
-      <polygon
-        points={zone.polygon}
-        fill="transparent"
-        stroke="transparent"
-        strokeWidth="8"
-      />
+    <g>
+      {/* Shadow */}
+      <rect x={x + 3} y={y + 3} width={w} height={h} rx={2} fill="rgba(0,0,0,0.35)" />
+      {/* Net */}
+      <rect x={x + 5} y={y + 5} width={w - 10} height={h - 5} fill="#0c1e36" />
+      {/* Net vertical lines */}
+      {[1, 2].map(i => (
+        <line key={`nv${i}`}
+          x1={x + 5 + ((w - 10) / 3) * i} y1={y + 5}
+          x2={x + 5 + ((w - 10) / 3) * i} y2={y + h}
+          stroke="#2a4a6a" strokeWidth="1" />
+      ))}
+      {/* Net horizontal lines */}
+      {[1, 2].map(i => (
+        <line key={`nh${i}`}
+          x1={x + 5} y1={y + 5 + ((h - 5) / 3) * i}
+          x2={x + w - 5} y2={y + 5 + ((h - 5) / 3) * i}
+          stroke="#2a4a6a" strokeWidth="1" />
+      ))}
+      {/* Frame */}
+      <rect x={x} y={y} width={w} height={h} rx={2}
+            fill="none" stroke="#ef4444" strokeWidth="4.5" />
+      {/* Stripe overlay on posts */}
+      {[0,1,2,3,4,5,6].map(i => (
+        <rect key={`ls${i}`} x={x} y={y + i * 8}
+              width={4.5} height={4} fill={i % 2 === 0 ? '#ef4444' : '#fff'} />
+      ))}
+      {[0,1,2,3,4,5,6].map(i => (
+        <rect key={`rs${i}`} x={x + w - 4.5} y={y + i * 8}
+              width={4.5} height={4} fill={i % 2 === 0 ? '#ef4444' : '#fff'} />
+      ))}
+      {/* Crossbar stripes */}
+      {[0,1,2,3,4,5,6,7,8].map(i => (
+        <rect key={`cs${i}`} x={x + i * 11} y={y}
+              width={6} height={4} fill={i % 2 === 0 ? '#ef4444' : '#fff'} />
+      ))}
+      {/* Bright outline */}
+      <rect x={x} y={y} width={w} height={h} rx={2}
+            fill="none" stroke="#ff8080" strokeWidth="1" />
     </g>
   )
 }
@@ -112,155 +122,127 @@ export default function CourtView({
 }) {
   const maxHeat = Math.max(0, ...Object.values(heatmap))
 
-  const handleZoneClick = (zoneId) => {
-    onZoneSelect?.(selectedZone === zoneId ? null : zoneId)
-  }
+  const click = (id) => onZoneSelect?.(selectedZone === id ? null : id)
 
   return (
     <div className={clsx('relative w-full select-none', className)}>
       <svg
-        viewBox="0 0 360 420"
+        viewBox="0 0 320 500"
         xmlns="http://www.w3.org/2000/svg"
-        style={{
-          transform: flipped ? 'scaleX(-1)' : 'none',
-          maxHeight: '52vh',
-        }}
-        className="w-full"
+        style={{ transform: flipped ? 'scaleX(-1)' : 'none', width: '100%', display: 'block' }}
       >
-        {/* ── Court background ── */}
-        <rect width="360" height="420" fill="#0d1b2a" />
-        <rect x="0" y="50" width="360" height="370" fill="#0f2744" />
+        {/* Background */}
+        <rect width="320" height="500" fill="#0d1b2a" />
+        <rect x="0" y={CY} width="320" height={500 - CY} fill="#0f2744" />
 
-        {/* ── 6m D-area ── */}
+        {/* 6m filled D-zone */}
         <path
-          d="M 80,50 A 100,100 0 0 1 280,50"
-          fill="#0a1f3a"
-          stroke="#4a7fc1"
-          strokeWidth="1.5"
+          d={`M ${CX - 120},${CY} A 120,120 0 0 1 ${CX + 120},${CY} Z`}
+          fill="#0c2050" stroke="#4a7fc1" strokeWidth="2"
         />
 
-        {/* ── 9m free-throw line (dashed) ── */}
+        {/* 9m dashed arc */}
         <path
-          d="M 22,50 A 158,158 0 0 1 338,50"
-          fill="none"
-          stroke="#4a7fc1"
-          strokeWidth="1"
-          strokeDasharray="7 4"
-          opacity="0.6"
+          d={`M ${CX - 183},${CY} A 183,183 0 0 1 ${CX + 183},${CY}`}
+          fill="none" stroke="#4a7fc1" strokeWidth="1.2"
+          strokeDasharray="8 5" opacity="0.65"
         />
 
-        {/* ── Zone divider lines ── */}
-        {[72, 144, 180, 216, 288].map((bx) => (
-          <line
-            key={bx}
-            x1="180" y1="50"
-            x2={bx} y2="420"
-            stroke="#4a7fc1"
-            strokeWidth="0.8"
-            opacity="0.45"
+        {/* Zone fills */}
+        {COURT_ZONES.map(z => {
+          const sel = selectedZone === z.id
+          const heat = maxHeat > 0 ? (heatmap[z.id] ?? 0) / maxHeat : 0
+          return (
+            <g key={z.id} onClick={() => click(z.id)} style={{ cursor: 'pointer' }}>
+              <polygon
+                points={z.pts}
+                fill={sel
+                  ? 'rgba(234,179,8,0.38)'
+                  : heat > 0
+                    ? `rgba(239,100,97,${0.08 + heat * 0.48})`
+                    : 'transparent'}
+                stroke={sel ? '#eab308' : 'transparent'}
+                strokeWidth={sel ? 2 : 0}
+              />
+              {/* Fat hit area */}
+              <polygon points={z.pts} fill="transparent" stroke="transparent" strokeWidth="14" />
+            </g>
+          )
+        })}
+
+        {/* 7m spot clickable */}
+        <g onClick={() => click('7m')} style={{ cursor: 'pointer' }}>
+          <circle cx={CX} cy={CY + 172} r={24}
+            fill={selectedZone === '7m' ? 'rgba(234,179,8,0.35)' : 'transparent'}
+            stroke={selectedZone === '7m' ? '#eab308' : 'transparent'}
+            strokeWidth="2"
           />
-        ))}
-        {/* Extreme boundaries */}
-        <line x1="147" y1="50" x2="0"   y2="420" stroke="#4a7fc1" strokeWidth="0.8" opacity="0.45" />
-        <line x1="213" y1="50" x2="360" y2="420" stroke="#4a7fc1" strokeWidth="0.8" opacity="0.45" />
+        </g>
+        <circle cx={CX} cy={CY + 172} r={4} fill="#fff" opacity="0.85" style={{ pointerEvents: 'none' }} />
 
-        {/* ── Pivot zone boundary line ── */}
-        <line x1="135" y1="118" x2="225" y2="118" stroke="#4a7fc1" strokeWidth="1" opacity="0.5" strokeDasharray="4 3" />
+        {/* Zone divider lines */}
+        <line x1={T_LEFT}  y1={CY} x2={B_EXT_LEFT}   y2={BOTTOM} stroke="#4a7fc1" strokeWidth="1.2" opacity="0.55" />
+        <line x1={CX}      y1={CY} x2={B_BACK_LEFT}  y2={BOTTOM} stroke="#4a7fc1" strokeWidth="1.2" opacity="0.55" />
+        <line x1={CX}      y1={CY} x2={B_BACK_RIGHT} y2={BOTTOM} stroke="#4a7fc1" strokeWidth="1.2" opacity="0.55" />
+        <line x1={T_RIGHT} y1={CY} x2={B_EXT_RIGHT}  y2={BOTTOM} stroke="#4a7fc1" strokeWidth="1.2" opacity="0.55" />
 
-        {/* ── 7m spot ── */}
-        <circle cx="180" cy="176" r="4" fill="#fff" opacity="0.8" />
+        {/* Pivot bottom line */}
+        <line x1={PIVOT_BL} y1={PIVOT_BOTTOM} x2={PIVOT_BR} y2={PIVOT_BOTTOM}
+              stroke="#4a7fc1" strokeWidth="1" opacity="0.5" strokeDasharray="5 3" />
 
-        {/* ── Clickable zones ── */}
-        {COURT_ZONES.map(zone => (
-          <ZonePolygon
-            key={zone.id}
-            zone={zone}
-            isSelected={selectedZone === zone.id}
-            onClick={handleZoneClick}
-            heatValue={heatmap[zone.id] ?? 0}
-            maxHeat={maxHeat}
-          />
-        ))}
+        {/* Goal line */}
+        <line x1="0" y1={CY} x2="320" y2={CY} stroke="#4a7fc1" strokeWidth="1.5" opacity="0.35" />
 
-        {/* ── 7m clickable area ── */}
-        <circle
-          cx="180" cy="176" r="18"
-          fill={selectedZone === '7m' ? ZONE_FILL_ACTIVE : 'transparent'}
-          stroke={selectedZone === '7m' ? '#eab308' : 'transparent'}
-          strokeWidth="2"
-          className="cursor-pointer"
-          onClick={() => handleZoneClick('7m')}
-        />
+        {/* Goal */}
+        <Goal />
 
-        {/* ── Outside button (rendered separately, not a court zone) ── */}
-
-        {/* ── Goal rectangle ── */}
-        <rect
-          x="147" y="12" width="66" height="40"
-          fill="#1a2f4a"
-          stroke="#ef6461"
-          strokeWidth="2"
-          rx="2"
-        />
-        {/* Goal grid lines 3×3 */}
-        <line x1="169" y1="12" x2="169" y2="52" stroke="#4a7fc1" strokeWidth="1" opacity="0.7" />
-        <line x1="191" y1="12" x2="191" y2="52" stroke="#4a7fc1" strokeWidth="1" opacity="0.7" />
-        <line x1="147" y1="25" x2="213" y2="25" stroke="#4a7fc1" strokeWidth="1" opacity="0.7" />
-        <line x1="147" y1="38" x2="213" y2="38" stroke="#4a7fc1" strokeWidth="1" opacity="0.7" />
-
-        {/* ── Zone labels (when not flipped to avoid mirrored text) ── */}
+        {/* Zone labels */}
         {showLabels && !flipped && (
           <g style={{ pointerEvents: 'none' }}>
-            {COURT_ZONES.map(zone => {
-              const isSelected = selectedZone === zone.id
-              const lines = zone.label.split('\n')
-              return lines.map((line, i) => (
-                <text
-                  key={`${zone.id}-${i}`}
-                  x={zone.labelPos.x}
-                  y={zone.labelPos.y + i * 13}
+            {COURT_ZONES.map(z => {
+              const sel = selectedZone === z.id
+              return z.label.map((line, i) => (
+                <text key={`${z.id}-${i}`}
+                  x={z.lx} y={z.ly + i * 14}
                   textAnchor="middle"
-                  fill={isSelected ? '#eab308' : '#8ba3c1'}
-                  fontSize="10"
-                  fontWeight={isSelected ? 'bold' : 'normal'}
+                  fill={sel ? '#eab308' : 'rgba(139,163,193,0.8)'}
+                  fontSize="11"
+                  fontWeight={sel ? 'bold' : 'normal'}
                 >
                   {line}
                 </text>
               ))
             })}
-            <text x="195" y="183" fill="#8ba3c1" fontSize="10">7m</text>
+            <text x={CX + 30} y={CY + 177}
+              fill={selectedZone === '7m' ? '#eab308' : 'rgba(139,163,193,0.8)'}
+              fontSize="10">7m</text>
           </g>
         )}
 
-        {/* ── Heatmap count overlay ── */}
-        {Object.keys(heatmap).length > 0 && (
-          <g style={{ pointerEvents: 'none' }}>
-            {COURT_ZONES.map(zone => heatmap[zone.id] ? (
-              <text
-                key={`heat-${zone.id}`}
-                x={zone.labelPos.x}
-                y={zone.labelPos.y - 14}
-                textAnchor="middle"
-                fill="#fff"
-                fontSize="16"
-                fontWeight="bold"
-                opacity="0.9"
-              >
-                {heatmap[zone.id]}
-              </text>
-            ) : null)}
-          </g>
-        )}
+        {/* Heatmap counts */}
+        {maxHeat > 0 && COURT_ZONES.map(z => {
+          const val = heatmap[z.id]
+          if (!val) return null
+          return (
+            <text key={`h-${z.id}`}
+              x={z.lx} y={z.ly - 16}
+              textAnchor="middle" fill="#fff"
+              fontSize="18" fontWeight="bold"
+              style={{ pointerEvents: 'none' }}>
+              {val}
+            </text>
+          )
+        })}
       </svg>
 
-      {/* ── Outside button (below SVG) ── */}
+      {/* Afuera button */}
       <button
-        onClick={() => handleZoneClick('outside')}
+        onClick={() => click('outside')}
         className={clsx(
-          'absolute top-1 right-2 text-xs px-2 py-1 rounded-lg border transition-all',
+          'absolute top-2 right-2 text-xs px-2.5 py-1 rounded-lg border font-semibold transition-all',
           selectedZone === 'outside'
             ? 'bg-yellow-500/30 border-yellow-400 text-yellow-300'
-            : 'bg-white/5 border-white/20 text-gray-400',
+            : 'bg-white/5 border-white/20 text-gray-400 hover:text-white',
         )}
       >
         Afuera
