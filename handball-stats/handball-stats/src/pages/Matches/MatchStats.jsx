@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
-import { SHOT_RESULTS, ZONES } from '@/constants'
+import { ZONES } from '@/constants'
 import { CourtTopDown } from '@/components/court/CourtPanel'
 import GoalGrid from '@/components/court/GoalGrid'
 import { Spinner } from '@/components/ui'
@@ -98,9 +98,7 @@ export default function MatchStats() {
   const TABS = ['resumen','arquero','jugadores','zonas']
 
   if (loading) return (
-    <div className="flex justify-center items-center h-screen bg-court-bg">
-      <Spinner size={10} />
-    </div>
+    <div className="flex justify-center items-center h-screen bg-court-bg"><Spinner size={10} /></div>
   )
 
   return (
@@ -115,9 +113,7 @@ export default function MatchStats() {
             <p className="text-gray-500 text-xs">Estadísticas</p>
           </div>
           <button onClick={() => navigate(`/matches/${id}`)}
-            className="text-brand-primary text-sm font-semibold">
-            ▶ Partido
-          </button>
+            className="text-brand-primary text-sm font-semibold">▶ Partido</button>
         </div>
       </div>
 
@@ -125,7 +121,7 @@ export default function MatchStats() {
         {TABS.map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={`flex-1 py-3 text-xs font-semibold capitalize transition-all
-              ${tab === t ? 'text-brand-secondary border-b-2 border-brand-secondary' : 'text-gray-500'}`}>
+              ${tab===t ? 'text-brand-secondary border-b-2 border-brand-secondary' : 'text-gray-500'}`}>
             {t}
           </button>
         ))}
@@ -137,7 +133,7 @@ export default function MatchStats() {
             <div className="grid grid-cols-2 gap-3">
               <StatBlock label="Tiros totales" value={shots.length} />
               <StatBlock label="Goles" value={goals.length}
-                sub={shots.length > 0 ? `${Math.round(goals.length/shots.length*100)}% efectividad` : ''} />
+                sub={shots.length>0 ? `${Math.round(goals.length/shots.length*100)}% efectividad` : ''} />
               <StatBlock label="Atajados" value={saved.length} />
               <StatBlock label="Errados" value={missed.length} />
             </div>
@@ -147,28 +143,23 @@ export default function MatchStats() {
             </div>
           </>
         )}
-
         {tab === 'arquero' && <GoalkeeperStats gkStats={gkStats} />}
-
         {tab === 'jugadores' && (
           <p className="text-gray-500 text-center py-8">Próximamente.</p>
         )}
-
         {tab === 'zonas' && (
           <>
-            <div style={{ height: 280 }}>
+            <div style={{ height: 260 }}>
               <CourtTopDown heatmap={zoneHeatmap} selectedZone={null} onZoneSelect={() => {}} />
             </div>
             <div className="flex flex-col gap-2">
-              {zoneStats.sort((a, b) => b.total - a.total).map(z => (
+              {zoneStats.sort((a,b) => b.total-a.total).map(z => (
                 <div key={z.id} className="bg-court-surface rounded-xl p-3 flex items-center justify-between">
                   <p className="text-white font-medium text-sm">{z.label}</p>
                   <div className="flex gap-3 text-sm">
                     <span className="text-gray-400">{z.total} tiros</span>
                     <span className="text-green-400 font-bold">{z.goals} goles</span>
-                    <span className="text-gray-500">
-                      {z.total > 0 ? Math.round(z.goals / z.total * 100) : 0}%
-                    </span>
+                    <span className="text-gray-500">{z.total>0 ? Math.round(z.goals/z.total*100) : 0}%</span>
                   </div>
                 </div>
               ))}
