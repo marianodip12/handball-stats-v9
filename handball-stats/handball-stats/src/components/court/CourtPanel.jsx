@@ -12,10 +12,9 @@ import CourtView from './CourtView'
  *   1. Usuario selecciona zona de cancha  → selectedZone
  *   2. Usuario selecciona zona del arco   → selectedGoalSection
  *   3. Ambas seleccionadas                → aparece overlay resultado
- *      - zona dentro del arco (tl…br)    → opciones: Gol | Atajado
- *      - zona fuera del arco ('errado')  → opción: Errado
- *   4. Usuario confirma resultado         → onShotRegistered({ zone, goalSection, result })
- *   5. Se limpia la selección
+ *      - zona dentro del arco (tl…br)    → Gol | Atajado  → llama onGol / onGuardarTiro
+ *      - zona fuera del arco ('errado')  → Errado         → llama onErrado (o onGuardarTiro)
+ *   4. Se limpia la selección
  */
 
 const ZONE_NAMES = {
@@ -38,12 +37,12 @@ const GOAL_NAMES = {
 }
 
 // ── Result Overlay ─────────────────────────────────────────────
-function ResultOverlay({ courtZone, goalSection, onConfirm, onCancel }) {
+function ResultOverlay({ courtZone, goalSection, onGol, onSaved, onErrado, onCancel }) {
   if (!courtZone || !goalSection) return null
 
-  const isErrado = goalSection === 'errado'
-  const zoneName = ZONE_NAMES[courtZone]  ?? courtZone
-  const goalName = GOAL_NAMES[goalSection] ?? goalSection
+  const isErrado  = goalSection === 'errado'
+  const zoneName  = ZONE_NAMES[courtZone]   ?? courtZone
+  const goalName  = GOAL_NAMES[goalSection] ?? goalSection
 
   return (
     <div
@@ -60,7 +59,7 @@ function ResultOverlay({ courtZone, goalSection, onConfirm, onCancel }) {
 
         {isErrado ? (
           <button
-            onClick={() => onConfirm('errado')}
+            onClick={onErrado}
             className="py-3 rounded-xl font-bold text-base text-white transition-transform active:scale-95"
             style={{ background: '#666' }}
           >
@@ -69,14 +68,14 @@ function ResultOverlay({ courtZone, goalSection, onConfirm, onCancel }) {
         ) : (
           <>
             <button
-              onClick={() => onConfirm('gol')}
+              onClick={onGol}
               className="py-3 rounded-xl font-bold text-base text-white transition-transform active:scale-95"
               style={{ background: '#e8453c' }}
             >
               ⚽ Gol
             </button>
             <button
-              onClick={() => onConfirm('atajado')}
+              onClick={onSaved}
               className="py-3 rounded-xl font-bold text-base text-white transition-transform active:scale-95"
               style={{ background: '#2ecfb0' }}
             >
@@ -99,21 +98,35 @@ function ResultOverlay({ courtZone, goalSection, onConfirm, onCancel }) {
 
 // ── Main export ─────────────────────────────────────────────────
 export default function CourtPanel({
+  // Zone selection
   selectedZone,
   onZoneSelect,
   selectedGoalSection,
   onGoalSectionSelect,
+  // Layout
   isInterrupted,
+  showGoalButtons,      // kept for backward compat (unused in new flow)
   heatmap = {},
-  onShotRegistered,   // ({ zone, goalSection, result }) => void
+  // Result callbacks (same as LiveMatch.jsx)
+  onGol,
+  onGuardarTiro,
+  onErrado,             // optional: called when shot is outside goal
 }) {
   const bothSelected = selectedZone && selectedGoalSection
 
-  const handleConfirm = (result) => {
-    onShotRegistered?.({ zone: selectedZone, goalSection: selectedGoalSection, result })
-    // Reset both selections
-    onZoneSelect?.(null)
-    onGoalSectionSelect?.(null)
+  const handleGol = () => {
+    onGol?.()
+    // onGol already calls clearEventBuilder in LiveMatch
+  }
+
+  const handleSaved = () => {
+    onGuardarTiro?.()
+  }
+
+  const handleErrado = () => {
+    // If no dedicated errado handler, fall back to saved
+    if (onErrado) onErrado()
+    else onGuardarTiro?.()
   }
 
   const handleCancel = () => {
@@ -152,12 +165,14 @@ export default function CourtPanel({
         />
       </div>
 
-      {/* ── OVERLAY resultado ── */}
+      {/* ── OVERLAY resultado (aparece cuando ambas zonas están seleccionadas) ── */}
       {bothSelected && (
         <ResultOverlay
           courtZone={selectedZone}
           goalSection={selectedGoalSection}
-          onConfirm={handleConfirm}
+          onGol={handleGol}
+          onSaved={handleSaved}
+          onErrado={handleErrado}
           onCancel={handleCancel}
         />
       )}
@@ -165,5 +180,6 @@ export default function CourtPanel({
   )
 }
 
+// Named exports for MatchStats and other consumers
 export { CourtView }
-export { default as CourtTopDown } from './CourtView'
+export { CourtView as CourtTopDown }
