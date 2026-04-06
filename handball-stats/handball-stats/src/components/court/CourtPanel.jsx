@@ -166,3 +166,4 @@ export default function CourtPanel({
 }
 
 export { CourtView }
+export { default as CourtTopDown } from './CourtView'
