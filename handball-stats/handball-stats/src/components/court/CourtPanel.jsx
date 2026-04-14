@@ -1,22 +1,6 @@
 import GoalGrid from './GoalGrid'
 import CourtView from './CourtView'
 
-/**
- * CourtPanel
- *
- * Layout:
- *   ~35%  → GoalGrid (arco 3×3, sin barra inferior)
- *   ~65%  → CourtView (cancha top-down 8 zonas + 7m)
- *
- * Flujo:
- *   1. Usuario selecciona zona de cancha  → selectedZone
- *   2. Usuario selecciona zona del arco   → selectedGoalSection
- *   3. Ambas seleccionadas                → aparece overlay resultado
- *      - zona dentro del arco (tl…br)    → Gol | Atajado  → llama onGol / onGuardarTiro
- *      - zona fuera del arco ('errado')  → Errado         → llama onErrado (o onGuardarTiro)
- *   4. Se limpia la selección
- */
-
 const ZONE_NAMES = {
   extreme_left:  'Ext. Izq.',
   lateral_left:  'Lat. Izq.',
@@ -36,24 +20,87 @@ const GOAL_NAMES = {
   errado: 'Fuera del arco',
 }
 
+// ── Team Selector ──────────────────────────────────────────────
+function TeamSelector({ homeTeam, awayTeam, selectedTeamSide, onTeamSelect }) {
+  const homeName  = homeTeam?.short_name  ?? homeTeam?.name  ?? 'Local'
+  const awayName  = awayTeam?.short_name  ?? awayTeam?.name  ?? 'Visitante'
+  const homeColor = homeTeam?.color ?? '#ef6461'
+  const awayColor = awayTeam?.color ?? '#48cae4'
+
+  return (
+    <div
+      className="flex-shrink-0 flex items-center gap-2 px-2 py-1"
+      style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.2)' }}
+    >
+      <span className="text-[10px] text-gray-500 uppercase tracking-wider whitespace-nowrap">
+        Ataca:
+      </span>
+
+      <button
+        onClick={() => onTeamSelect?.('home')}
+        className="flex-1 py-1 px-2 rounded-lg text-xs font-bold transition-all active:scale-95"
+        style={{
+          background: selectedTeamSide === 'home' ? homeColor : 'rgba(255,255,255,0.06)',
+          color: selectedTeamSide === 'home' ? '#fff' : '#888',
+          border: `1.5px solid ${selectedTeamSide === 'home' ? homeColor : 'rgba(255,255,255,0.1)'}`,
+        }}
+      >
+        {homeName}
+      </button>
+
+      <span className="text-gray-600 text-[10px]">vs</span>
+
+      <button
+        onClick={() => onTeamSelect?.('away')}
+        className="flex-1 py-1 px-2 rounded-lg text-xs font-bold transition-all active:scale-95"
+        style={{
+          background: selectedTeamSide === 'away' ? awayColor : 'rgba(255,255,255,0.06)',
+          color: selectedTeamSide === 'away' ? '#fff' : '#888',
+          border: `1.5px solid ${selectedTeamSide === 'away' ? awayColor : 'rgba(255,255,255,0.1)'}`,
+        }}
+      >
+        {awayName}
+      </button>
+    </div>
+  )
+}
+
 // ── Result Overlay ─────────────────────────────────────────────
-function ResultOverlay({ courtZone, goalSection, onGol, onSaved, onErrado, onCancel }) {
+function ResultOverlay({
+  courtZone, goalSection,
+  homeTeam, awayTeam, selectedTeamSide,
+  onGol, onSaved, onErrado, onCancel,
+}) {
   if (!courtZone || !goalSection) return null
 
-  const isErrado  = goalSection === 'errado'
-  const zoneName  = ZONE_NAMES[courtZone]   ?? courtZone
-  const goalName  = GOAL_NAMES[goalSection] ?? goalSection
+  const isErrado = goalSection === 'errado'
+  const zoneName = ZONE_NAMES[courtZone]   ?? courtZone
+  const goalName = GOAL_NAMES[goalSection] ?? goalSection
+
+  const teamName  = selectedTeamSide === 'home'
+    ? (homeTeam?.short_name ?? homeTeam?.name ?? 'Local')
+    : (awayTeam?.short_name ?? awayTeam?.name ?? 'Visitante')
+  const teamColor = selectedTeamSide === 'home'
+    ? (homeTeam?.color ?? '#ef6461')
+    : (awayTeam?.color ?? '#48cae4')
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: 'rgba(0,0,0,0.6)' }}
+      style={{ background: 'rgba(0,0,0,0.65)' }}
     >
       <div
-        className="flex flex-col gap-3 rounded-2xl p-6"
-        style={{ background: '#132a4e', minWidth: 220, boxShadow: '0 8px 40px rgba(0,0,0,0.6)' }}
+        className="flex flex-col gap-3 rounded-2xl p-5 w-72"
+        style={{ background: '#132a4e', boxShadow: '0 8px 40px rgba(0,0,0,0.6)' }}
       >
-        <p className="text-center text-xs text-gray-400 font-semibold mb-1">
+        <div
+          className="text-center text-xs font-bold py-1.5 rounded-lg"
+          style={{ background: teamColor + '33', color: teamColor, border: `1px solid ${teamColor}55` }}
+        >
+          ⚡ {teamName}
+        </div>
+
+        <p className="text-center text-xs text-gray-400 font-semibold">
           {zoneName} → {goalName}
         </p>
 
@@ -61,9 +108,9 @@ function ResultOverlay({ courtZone, goalSection, onGol, onSaved, onErrado, onCan
           <button
             onClick={onErrado}
             className="py-3 rounded-xl font-bold text-base text-white transition-transform active:scale-95"
-            style={{ background: '#666' }}
+            style={{ background: '#555' }}
           >
-            ✕ Errado
+            ✕ Errado / Fuera
           </button>
         ) : (
           <>
@@ -98,52 +145,45 @@ function ResultOverlay({ courtZone, goalSection, onGol, onSaved, onErrado, onCan
 
 // ── Main export ─────────────────────────────────────────────────
 export default function CourtPanel({
-  // Zone selection
   selectedZone,
   onZoneSelect,
   selectedGoalSection,
   onGoalSectionSelect,
-  // Layout
+  homeTeam,
+  awayTeam,
+  selectedTeamSide,
+  onTeamSelect,
   isInterrupted,
-  showGoalButtons,      // kept for backward compat (unused in new flow)
   heatmap = {},
-  // Result callbacks (same as LiveMatch.jsx)
   onGol,
   onGuardarTiro,
-  onErrado,             // optional: called when shot is outside goal
+  onErrado,
 }) {
   const bothSelected = selectedZone && selectedGoalSection
-
-  const handleGol = () => {
-    onGol?.()
-    // onGol already calls clearEventBuilder in LiveMatch
-  }
-
-  const handleSaved = () => {
-    onGuardarTiro?.()
-  }
-
-  const handleErrado = () => {
-    // If no dedicated errado handler, fall back to saved
-    if (onErrado) onErrado()
-    else onGuardarTiro?.()
-  }
-
-  const handleCancel = () => {
-    onGoalSectionSelect?.(null)
-  }
 
   return (
     <div className="flex flex-col w-full overflow-hidden" style={{ flex: 1, minHeight: 0 }}>
 
-      {/* ── ARCO: 35% height ── */}
-      <div style={{ flex: '0 0 35%', minHeight: 0, overflow: 'hidden' }}
-           className="px-2 pt-2">
-        <GoalGrid
-          selected={selectedGoalSection}
-          onSelect={onGoalSectionSelect}
-          counts={heatmap?.goal ?? {}}
-        />
+      {/* ── SELECTOR DE EQUIPO ── */}
+      <TeamSelector
+        homeTeam={homeTeam}
+        awayTeam={awayTeam}
+        selectedTeamSide={selectedTeamSide}
+        onTeamSelect={onTeamSelect}
+      />
+
+      {/* ── ARCO: centrado, altura por aspect-ratio (320:140 ≈ 2.28) ── */}
+      <div
+        className="flex-shrink-0 flex justify-center items-center px-3 pt-2 pb-2"
+        style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}
+      >
+        <div style={{ width: '100%', maxWidth: 560 }}>
+          <GoalGrid
+            selected={selectedGoalSection}
+            onSelect={onGoalSectionSelect}
+            counts={heatmap?.goal ?? {}}
+          />
+        </div>
       </div>
 
       {/* ── BANNER interrupción ── */}
@@ -156,7 +196,7 @@ export default function CourtPanel({
         </div>
       )}
 
-      {/* ── CANCHA: resto del espacio (~65%) ── */}
+      {/* ── CANCHA: flex:1 → ocupa ~80-85% del espacio restante ── */}
       <div style={{ flex: 1, minHeight: 0 }} className="overflow-hidden">
         <CourtView
           selectedZone={selectedZone}
@@ -165,21 +205,23 @@ export default function CourtPanel({
         />
       </div>
 
-      {/* ── OVERLAY resultado (aparece cuando ambas zonas están seleccionadas) ── */}
+      {/* ── OVERLAY resultado ── */}
       {bothSelected && (
         <ResultOverlay
           courtZone={selectedZone}
           goalSection={selectedGoalSection}
-          onGol={handleGol}
-          onSaved={handleSaved}
-          onErrado={handleErrado}
-          onCancel={handleCancel}
+          homeTeam={homeTeam}
+          awayTeam={awayTeam}
+          selectedTeamSide={selectedTeamSide}
+          onGol={() => { onGol?.() }}
+          onSaved={() => { onGuardarTiro?.() }}
+          onErrado={() => { if (onErrado) onErrado(); else onGuardarTiro?.() }}
+          onCancel={() => onGoalSectionSelect?.(null)}
         />
       )}
     </div>
   )
 }
 
-// Named exports for MatchStats and other consumers
 export { CourtView }
 export { CourtView as CourtTopDown }
